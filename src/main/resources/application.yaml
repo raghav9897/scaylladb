@@ -1,3 +1,24 @@
+server:
+  port: 9191
+
 spring:
   application:
     name: scyalladb
+  data:
+    cassandra:
+      contact-points: 127.0.0.1
+      port: 9042
+      keyspace-name: playback
+      local-datacenter: datacenter1
+      schema-action: none
+playback:
+  max-streams: 2
+  heartbeat-timeout-ms: 10000
+
+datastax-java-driver:
+  basic:
+    load-balancing-policy:
+      local-datacenter: datacenter1
+
+
+
