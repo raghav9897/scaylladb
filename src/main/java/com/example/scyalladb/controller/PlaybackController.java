@@ -1,9 +1,12 @@
 package com.example.scyalladb.controller;
 
-import com.example.scyalladb.dto.DestroyPlaybackRequest;
-import com.example.scyalladb.dto.HeartbeatRequest;
-import com.example.scyalladb.dto.RegisterPlaybackRequest;
+import com.example.scyalladb.dto.request.DestroyPlaybackRequest;
+import com.example.scyalladb.dto.request.HeartbeatRequest;
+import com.example.scyalladb.dto.request.RegisterPlaybackRequest;
+import com.example.scyalladb.dto.response.DestroyPlaybackResponse;
+import com.example.scyalladb.dto.response.ResponseDTO;
 import com.example.scyalladb.service.PlaybackService;
+import com.example.scyalladb.utils.response.ResponseUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,59 +20,54 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PlaybackController {
 
-
     private final PlaybackService service;
+    private final ResponseUtil responseUtil;
 
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterPlaybackRequest req) {
-        boolean s = service.register(req);
+    public ResponseDTO register(@Valid @RequestBody RegisterPlaybackRequest req,
+                                @RequestHeader(value = "locale", defaultValue = "en") String locale,
+                                @RequestHeader(value="true-client-ip",required = false) String trueClientIp,
+                                @RequestHeader(value = "x-authenticated-userid", required = false) String sid,
+                                @RequestHeader(value="tpr-id",required = false) String tprId,
+                                @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
 
-        if (!s){
-             return ResponseEntity
-                    .status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of(
-                            "code", 1,
-                            "message", "Playback registration failed",
-                            "data", Map.of()
-                    ));
 
-        }
 
-        return ResponseEntity.ok(Map.of(
-                "code", 0,
-                "message", "Playback registered successfully",
-                "data", Map.of(
-                        "deviceId", req.getDeviceId(),
-                        "ttl", 10
-                )
-        ));
+        return responseUtil.toSuccess(service.register(req),null);
+
     }
 
 
     @PostMapping("/heartbeat")
-    public ResponseEntity<?> heartbeat(@Valid @RequestBody HeartbeatRequest req) {
-        boolean updated = service.heartbeat(req.getSubscriberId(), req.getDeviceId());
-        return ResponseEntity.ok(Map.of(
-                "code", 0,
-                "message", "Heartbeat updated",
-                "data", Map.of("ttlRefreshed", updated)
-        ));
+    public ResponseDTO heartbeat(@Valid @RequestBody HeartbeatRequest req,
+                                 @RequestHeader(value = "locale", defaultValue = "en") String locale,
+                                 @RequestHeader(value="true-client-ip",required = false) String trueClientIp,
+                                 @RequestHeader(value = "x-authenticated-userid", required = false) String sid,
+                                 @RequestHeader(value="tpr-id",required = false) String tprId,
+                                 @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
+
+        return responseUtil.toSuccess(service.heartbeat(req),locale);
     }
 
 
-    @GetMapping("/{subscriberId}/devices")
-    public ResponseEntity<?> activeDevices(@PathVariable String subscriberId) {
-        return ResponseEntity.ok(Map.of(
-                "code", 0,
-                "message", "Success",
-                "data", Map.of("devices", service.fetchActiveDevices(subscriberId))
-        ));
+    @GetMapping("/{subscriberId}/{sessionId}/devices")
+    public ResponseDTO activeDevices(@PathVariable String subscriberId,@PathVariable String sessionId,
+                                     @RequestHeader(value = "locale", defaultValue = "en") String locale,
+                                     @RequestHeader(value="true-client-ip",required = false) String trueClientIp,
+                                     @RequestHeader(value = "x-authenticated-userid", required = false) String sid,
+                                     @RequestHeader(value="tpr-id",required = false) String tprId,
+                                     @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
+        return responseUtil.toSuccess(service.fetchDevices(subscriberId,sessionId),locale);
     }
 
 
-    @PostMapping("/destroy")
-    public ResponseEntity<?> destroy(@Valid @RequestBody DestroyPlaybackRequest req) {
+   /* @PostMapping("/destroy")
+    public ResponseDTO destroy(@Valid @RequestBody DestroyPlaybackRequest req,@RequestHeader(value = "locale", defaultValue = "en") String locale,
+                               @RequestHeader(value="true-client-ip",required = false) String trueClientIp,
+                               @RequestHeader(value = "x-authenticated-userid", required = true) String sid,
+                               @RequestHeader(value="tpr-id",required = false) String tprId,
+                               @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
        boolean isDestroyed = service.destroy(req.getSubscriberId(), req.getDeviceId());
        if(!isDestroyed){
           return ResponseEntity
@@ -85,6 +83,18 @@ public class PlaybackController {
                 "message", "Playback destroyed",
                 "data", Map.of("deviceId", req.getDeviceId())
         ));
+
+
+    }*/
+
+    @PostMapping("/destroy")
+    public ResponseDTO destroy(@Valid @RequestBody DestroyPlaybackRequest request,
+                               @RequestHeader(value = "locale", defaultValue = "en") String locale,
+                               @RequestHeader(value="true-client-ip",required = false) String trueClientIp,
+                               @RequestHeader(value = "x-authenticated-userid", required = false) String sid,
+                               @RequestHeader(value="tpr-id",required = false) String tprId,
+                               @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
+        return responseUtil.toSuccess(service.destroy(request),locale);
     }
 }
 

@@ -1,4 +1,4 @@
-package com.example.scyalladb.dto;
+package com.example.scyalladb.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -19,5 +19,8 @@ public class RegisterPlaybackRequest {
     private String appVersion;
     private String os;
     private String ip;
+    private String contentType;
+    private String contentId;
+    private String xStreamId;
 }
 

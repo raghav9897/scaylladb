@@ -1,10 +1,10 @@
-package com.example.scyalladb.dto;
+package com.example.scyalladb.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class DestroyPlaybackRequest {
+public class HeartbeatRequest {
     @NotBlank
     private String subscriberId;
 
@@ -12,6 +12,6 @@ public class DestroyPlaybackRequest {
     @NotBlank
     private String deviceId;
 
-
-    private String reason;
+    @NotBlank
+    private String sessionId;
 }

@@ -1,9 +1,12 @@
 server:
-  port: 9191
+  port: 8080
 
 spring:
   application:
-    name: scyalladb
+    name: concurrency-management
+  servlet:
+    context-path: /concurrency-management
+
   data:
     cassandra:
       contact-points: 127.0.0.1

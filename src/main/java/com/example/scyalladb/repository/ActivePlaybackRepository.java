@@ -2,6 +2,8 @@ package com.example.scyalladb.repository;
 
 import com.example.scyalladb.entity.ActivePlayback;
 import com.example.scyalladb.entity.PlaybackKey;
+import org.springframework.data.cassandra.core.query.Criteria;
+import org.springframework.data.cassandra.core.query.Query;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +16,13 @@ public interface ActivePlaybackRepository
 
     List<ActivePlayback> findByKeySubscriberId(String subscriberId);
     Optional<ActivePlayback> findByKeySubscriberIdAndKeyDeviceId(String subscriberId, String deviceId);
+
+
+
+
+
+
+
 
 }
 
