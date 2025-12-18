@@ -15,4 +15,5 @@ public class FetchDeviceDTO {
     private String deviceId;
     private Instant lastSeen;   // Use Instant for ISO 8601 timestamp
     private String deviceType;
+    private String status;
 }

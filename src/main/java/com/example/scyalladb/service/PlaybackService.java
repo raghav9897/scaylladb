@@ -316,7 +316,7 @@ public class PlaybackService {
         List<ActivePlayback> devices = repository.findByKeySubscriberId(subscriberId);
         log.info("Found {} active devices for subscriber={}", devices.size(), subscriberId);
         devices.forEach(x->log.info("{}, ={},={}",x.getKey().getDeviceId(),x.getLastSeen(),x.getDeviceType()));
-        List<FetchDeviceDTO> active = devices.stream() .map(x->new FetchDeviceDTO(x.getKey().getDeviceId(),x.getLastSeen(),x.getDeviceType())) .collect(Collectors.toUnmodifiableList());
+        List<FetchDeviceDTO> active = devices.stream() .map(x->new FetchDeviceDTO(x.getKey().getDeviceId(),x.getLastSeen(),x.getDeviceType(),x.getStatus())) .filter(x->"ACTIVE".equals(x.getStatus())).collect(Collectors.toUnmodifiableList());
         active.forEach(x->log.info("{}, ={},={}",x.getDeviceId(),x.getLastSeen(),x.getDeviceType()));
         return active; }
 }
