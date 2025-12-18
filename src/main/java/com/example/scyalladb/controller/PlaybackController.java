@@ -58,7 +58,7 @@ public class PlaybackController {
                                      @RequestHeader(value = "x-authenticated-userid", required = false) String sid,
                                      @RequestHeader(value="tpr-id",required = false) String tprId,
                                      @RequestHeader(value ="platform", defaultValue = "lit_android") String platform) {
-        return responseUtil.toSuccess(service.fetchDevices(subscriberId,sessionId),locale);
+        return responseUtil.toSuccess(service.fetchDevices(subscriberId,sessionId.trim()),locale);
     }
 
 

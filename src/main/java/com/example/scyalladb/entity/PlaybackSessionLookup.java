@@ -16,7 +16,10 @@ public class PlaybackSessionLookup {
     @PrimaryKey
     @Column("session_id")
     private String sessionId;
-
+    @Column("subscriber_id")
     private String subscriberId;
+    @Column("device_id")
     private String deviceId;
+    @Column("status")
+    private String status;
 }

@@ -11,6 +11,7 @@ import com.example.scyalladb.dto.response.FetchDevicesResponse;
 import com.example.scyalladb.dto.response.HeartbeatResponse;
 import com.example.scyalladb.dto.response.RegisterPlaybackResponse;
 import com.example.scyalladb.entity.ActivePlayback;
+import com.example.scyalladb.entity.PlaybackSessionLookup;
 import com.example.scyalladb.repository.ActivePlaybackRepository;
 import com.example.scyalladb.repository.PlaybackSessionLookupDao;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,14 @@ public class PlaybackService {
 
         // 4️⃣ Insert playback row with TTL
         insertActivePlayback(req, sessionId);
+        PlaybackSessionLookup lookup = new PlaybackSessionLookup(
+                sessionId,
+                req.getSubscriberId(),
+                req.getDeviceId(),
+                "ACTIVE"
+        );
+
+        sessionLookupDao.saveWithTtl(lookup, TTL_SECONDS);
 
         // 5️⃣ Build response
         return RegisterPlaybackResponse.builder()
@@ -68,19 +77,41 @@ public class PlaybackService {
     // Heartbeat
     public HeartbeatResponse heartbeat(HeartbeatRequest req) {
 
-        // 1️⃣ Find playback by sessionId
-        ActivePlayback existing = sessionLookupDao.findBySessionIdActivePlayback(req.getSessionId())
-                .orElseThrow(() ->
-                        new RuntimeException("Session expired or invalid")
-                );
+        // 1️⃣ Validate session
+        PlaybackSessionLookup sessionLookup =
+                sessionLookupDao.findBySessionId(req.getSessionId()).get();
 
-        // 2️⃣ Refresh lastSeen
-        existing.setLastSeen(Instant.now());
+        if (sessionLookup == null || !"ACTIVE".equals(sessionLookup.getStatus())) {
+            throw new RuntimeException("Session expired or invalid");
+        }
 
-        // 3️⃣ Re-insert with TTL = 10 seconds
-        heartbeatQuery(existing);
+        // 2️⃣ Ensure session belongs to same subscriber + device
+        if (!sessionLookup.getSubscriberId().equals(req.getSubscriberId())
+                || !sessionLookup.getDeviceId().equals(req.getDeviceId())) {
+            throw new RuntimeException("Session does not match device or subscriber");
+        }
 
-        // 4️⃣ Build response
+        // 3️⃣ Load active playback
+        ActivePlayback playback =
+                repository.findByKeySubscriberIdAndKeyDeviceId(
+                        req.getSubscriberId(),
+                        req.getDeviceId()
+                ).get();
+
+        if (playback == null) {
+            throw new RuntimeException("Playback session expired");
+        }
+
+        // 4️⃣ Refresh lastSeen
+        playback.setLastSeen(Instant.now());
+
+        // 5️⃣ Refresh TTL on active_playback
+        heartbeatQuery(playback);
+
+        // 6️⃣ Refresh TTL on session lookup
+        sessionLookupDao.saveWithTtl(sessionLookup, TTL_SECONDS);
+
+        // 7️⃣ Response
         return HeartbeatResponse.builder()
                 .ttlRefreshed(true)
                 .sessionId(req.getSessionId())
@@ -89,27 +120,22 @@ public class PlaybackService {
 
 
     // Fetch Active Devices
-    public FetchDevicesResponse fetchDevices(
-            String subscriberId,
-            String sessionId
-    ) {
+    public FetchDevicesResponse fetchDevices(String subscriberId, String sessionId) {
 
-        // 1️⃣ Validate requesting session
-        ActivePlayback requester = sessionLookupDao.findBySessionIdActivePlayback(sessionId)
-                .orElseThrow(() ->
-                        new RuntimeException("Session expired or invalid")
-                );
+        PlaybackSessionLookup sessionLookup = sessionLookupDao.findBySessionId(sessionId)
+                .orElseThrow(() -> new RuntimeException(
+                        "No active session found for sessionId " + sessionId));
 
-        // Extra safety: subscriber mismatch
-        if (!requester.getKey().getSubscriberId().equals(subscriberId)) {
-            throw new RuntimeException("Session does not belong to subscriber");
+        if (!"ACTIVE".equals(sessionLookup.getStatus())) {
+            throw new RuntimeException("Session expired or invalid");
         }
 
-        // 2️⃣ Fetch all active playbacks
-        List<ActivePlayback> playbacks =
-                repository.findByKeySubscriberId(subscriberId);
+        if (!sessionLookup.getSubscriberId().equals(subscriberId)) {
+            throw new RuntimeException("Session does not match device or subscriber");
+        }
 
-        // 3️⃣ Build device list
+        List<ActivePlayback> playbacks = repository.findByKeySubscriberId(subscriberId);
+
         List<DeviceInfo> devices = playbacks.stream()
                 .map(p -> DeviceInfo.builder()
                         .sessionId(p.getSessionId())
@@ -121,7 +147,6 @@ public class PlaybackService {
                         .build())
                 .toList();
 
-        // 4️⃣ Determine requester status
         boolean requesterActive = playbacks.stream()
                 .anyMatch(p -> p.getSessionId().equals(sessionId));
 
@@ -129,10 +154,11 @@ public class PlaybackService {
                 .sessionId(sessionId)
                 .status(requesterActive ? "ACTIVE" : "FORCE_STOP")
                 .requestedBySessionId(sessionId)
-                .requestedByDeviceId(requester.getKey().getDeviceId())
+                .requestedByDeviceId(sessionLookup.getDeviceId())
                 .ongoingSession(devices)
                 .build();
     }
+
 
 
     // Destroy Playback
@@ -248,30 +274,38 @@ public class PlaybackService {
         int forceStopTtl = TTL_SECONDS * 10;
 
         String cql = """
-        INSERT INTO active_playback (
-            subscriber_id,
-            device_id,
-            status,
-            last_seen,
-            device_type,
-            playback_token,
-            app_version,
-            os,
-            ip
-        ) VALUES (?, ?, ?, toTimestamp(now()), ?, ?, ?, ?, ?)
-        USING TTL ?
+    INSERT INTO active_playback (
+        subscriber_id,
+        device_id,
+        app_version,
+        content_id,
+        content_type,
+        device_type,
+        ip,
+        last_seen,
+        os,
+        playback_token,
+        session_id,
+        status,
+        x_stream_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, toTimestamp(now()), ?, ?, ?, ?, ?)
+    USING TTL ?
     """;
 
         return cassandraTemplate.getCqlOperations().execute(
                 cql,
                 existing.getKey().getSubscriberId(),
                 existing.getKey().getDeviceId(),
-                "FORCE_STOP",
-                existing.getDeviceType(),
-                existing.getPlaybackToken(),
                 existing.getAppVersion(),
-                existing.getOs(),
+                existing.getContentId(),
+                existing.getContentType(),
+                existing.getDeviceType(),
                 existing.getIp(),
+                existing.getOs(),
+                existing.getPlaybackToken(),
+                existing.getSessionId(),
+                "FORCE_STOP",          // status
+                existing.getXStreamId(),
                 forceStopTtl
         );
     }

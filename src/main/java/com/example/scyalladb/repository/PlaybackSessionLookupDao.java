@@ -1,5 +1,8 @@
 package com.example.scyalladb.repository;
 
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.example.scyalladb.entity.ActivePlayback;
 import com.example.scyalladb.entity.PlaybackSessionLookup;
 import lombok.RequiredArgsConstructor;
@@ -30,13 +33,14 @@ public class PlaybackSessionLookupDao {
     }
 
     public Optional<PlaybackSessionLookup> findBySessionId(String sessionId) {
-        return Optional.ofNullable(
-                cassandraTemplate.selectOneById(
-                        sessionId,
-                        PlaybackSessionLookup.class
-                )
-        );
+        SimpleStatement select = QueryBuilder.selectFrom("playback_session_lookup").all()
+                .whereColumn("session_id").isEqualTo(QueryBuilder.literal(sessionId))
+                .build();
+
+        PlaybackSessionLookup result = cassandraTemplate.selectOne(select, PlaybackSessionLookup.class);
+        return Optional.ofNullable(result);
     }
+
 
     public Optional<ActivePlayback> findBySessionIdActivePlayback(String sessionId) {
         return Optional.ofNullable(cassandraTemplate.selectOne(
